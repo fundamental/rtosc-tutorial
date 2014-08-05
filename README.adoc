@@ -26,7 +26,7 @@ Getting The Basics of Jack Running
 Before even writing any code for synthesis, the application must be able to talk
 to jack.
 
-.source[c]
+[source,c]
 ------------------------------------------------------------------
 #include <jack/jack.h>
 #include "jack_osc.h"
@@ -106,27 +106,27 @@ Block Diagram
 At this point the variables, constants, and parameters of the system should be
 defined, though there won't be any rtosc involvment yet.
 
-- Whole System
-    - Parameter: Sampling Frequency
-- Oscillator
-    - Variable: Phase
-- Noise Generator
-    - Stateless
-- Sequencer
-    - Parameter: Frequency Table
-    - Parameter: Noise Level
-    - Parameter: Noise Decay Rate
-    - Parameter: Beats Per Minute
-    - Variable:  Cached/Normalized Parameters
-    - Variable:  Time
-- LFO
-    - Parameter: Frequency
-    - Parameter: Amplitude
-    - Variable:  Phase
-- Filter
-    - Parameter: Cutoff Frequency
-    - Parameter: Q Value
-    - Variable:  History Values
+* Whole System
+** Parameter: Sampling Frequency
+* Oscillator
+** Variable: Phase
+* Noise Generator
+** Stateless
+* Sequencer
+** Parameter: Frequency Table
+** Parameter: Noise Level
+** Parameter: Noise Decay Rate
+** Parameter: Beats Per Minute
+** Variable:  Cached/Normalized Parameters
+** Variable:  Time
+* LFO
+** Parameter: Frequency
+** Parameter: Amplitude
+** Variable:  Phase
+* Filter
+** Parameter: Cutoff Frequency
+** Parameter: Q Value
+** Variable:  History Values
 
 With this information defined, the structs for all data can be defined with
 relative ease.
@@ -188,6 +188,7 @@ This class can be subclassed as needed to provide extra information.
 
 As a first port let's add the sequencer's bpm
 
+[source,c++]
 -------------------------------
 rtosc::Ports seq_ports =
 {
@@ -338,6 +339,7 @@ For the basic macros involved in the port definitions these properties can just
 be put at the end of the macro call before the documentation string.
 With this in mind, let's document things
 
+[source,c++]
 ----------------------------------------------------------
 #define Units(x) rMap(units, x)
 #define UnitLess rProp(unitless)
@@ -384,6 +386,7 @@ dumping ports to the input format.
 
 To do so, let's modify the start of main() to
 
+[source,c++]
 -------------------
 int main(int argc, char **argv)
 {
