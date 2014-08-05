@@ -26,7 +26,7 @@ Getting The Basics of Jack Running
 Before even writing any code for synthesis, the application must be able to talk
 to jack.
 
-[source,c]
+[source,c++]
 ------------------------------------------------------------------
 #include <jack/jack.h>
 #include "jack_osc.h"
@@ -143,6 +143,7 @@ Adding two addresses is simple enough but fairly verbose
 Basic RtOsc
 -----------
 
+[source,c++]
 -------------------
 if(!strcmp("/lfo/freq", msg) && !strcmp("f", rtosc_argument_string(msg)))
 asdf
@@ -224,6 +225,7 @@ For a full hierarchy it is just a matter of repeating this pattern.
 This can be pretty repetitive however, so let's consider abstracting away some
 of that repetition for "ports".
 
+[source,c++]
 ------------------------
 #define BasePort(name) {#name "/", 0, &name##_ports, [](const char *msg, \
                        rtosc::RtData &d)\
@@ -241,6 +243,7 @@ of similar (though somewhat more robust) macros.
 
 Fleshing out the various port tables, we are left with:
 
+[source,c++]
 ----------------------------------------------------------
 #define rObject sequencer_t
 rtosc::Ports seq_ports = {
@@ -401,4 +404,37 @@ int main(int argc, char **argv)
 bla bla
 ------------
 
-Now let
+Now just open up the resulting html index to see the API documentation
+
+User Interfaces
+---------------
+
+Now that all the system is setup and documented, slapping on a GUI is pretty
+simple.
+This portion will be in FLTK due to it's simplicity, but any toolkit should
+work fine.
+
+
+Development Grade Undo, Saving, and MIDI learning
+-------------------------------------------------
+
+Now that the UI is setup, some of the things that users might expect which can
+rely heavily on the dispatch system is undo/redo, saving/loading, and
+MIDI learning support.
+All of these features are still under moderately heavy development, so be
+prepared for some of these details to change in the future.
+
+Right now, MIDI learning is in the roughest development stage, so that topic
+will be covered last.
+So, the first topic is getting a functional undo/redo system setup.
+
+Undo/Redo
+~~~~~~~~~
+
+Now, you might think that generating an undo/redo system might be a hard task,
+however it is already mostly done.
+On the middleware side of things just inspect the events after changing some
+parameters around
+
+-----------------------
+-----------------------
