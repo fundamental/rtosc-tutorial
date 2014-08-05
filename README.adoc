@@ -26,7 +26,7 @@ Getting The Basics of Jack Running
 Before even writing any code for synthesis, the application must be able to talk
 to jack.
 
-[source,c++]
+[source,cpp]
 ------------------------------------------------------------------
 #include <jack/jack.h>
 #include "jack_osc.h"
@@ -143,7 +143,7 @@ Adding two addresses is simple enough but fairly verbose
 Basic RtOsc
 -----------
 
-[source,c++]
+[source,cpp]
 -------------------
 if(!strcmp("/lfo/freq", msg) && !strcmp("f", rtosc_argument_string(msg)))
 asdf
@@ -189,7 +189,7 @@ This class can be subclassed as needed to provide extra information.
 
 As a first port let's add the sequencer's bpm
 
-[source,c++]
+[source,cpp]
 --------------------------------------------------------------------------------
 rtosc::Ports seq_ports =
 {
@@ -225,7 +225,7 @@ For a full hierarchy it is just a matter of repeating this pattern.
 This can be pretty repetitive however, so let's consider abstracting away some
 of that repetition for "ports".
 
-[source,c++]
+[source,cpp]
 ------------------------
 #define BasePort(name) {#name "/", 0, &name##_ports, [](const char *msg, \
                        rtosc::RtData &d)\
@@ -243,7 +243,7 @@ of similar (though somewhat more robust) macros.
 
 Fleshing out the various port tables, we are left with:
 
-[source,c++]
+[source,cpp]
 ----------------------------------------------------------
 #define rObject sequencer_t
 rtosc::Ports seq_ports = {
@@ -342,7 +342,7 @@ For the basic macros involved in the port definitions these properties can just
 be put at the end of the macro call before the documentation string.
 With this in mind, let's document things
 
-[source,c++]
+[source,cpp]
 ----------------------------------------------------------
 #define Units(x) rMap(units, x)
 #define UnitLess rProp(unitless)
@@ -389,7 +389,7 @@ dumping ports to the input format.
 
 To do so, let's modify the start of main() to
 
-[source,c++]
+[source,cpp]
 -------------------
 int main(int argc, char **argv)
 {
@@ -407,13 +407,23 @@ bla bla
 Now just open up the resulting html index to see the API documentation
 
 User Interfaces
----------------
+--------------- 
 
 Now that all the system is setup and documented, slapping on a GUI is pretty
 simple.
 This portion will be in FLTK due to it's simplicity, but any toolkit should
 work fine.
 
+[source,cpp]
+--------------------------------------------------------------------------------
+include::gui.cpp[]
+--------------------------------------------------------------------------------
+<1> This example will only work with one typeclass for simplicity
+<2> Linear mapping between the min/max is pretty trivial to add
+<3> Descriptions make reasonable basic tooltips
+
+The end result is a pretty ugly GUI, but one that does work and it is connected
+through relatively simple dispatching/reflection.
 
 Development Grade Undo, Saving, and MIDI learning
 -------------------------------------------------
@@ -436,5 +446,103 @@ however it is already mostly done.
 On the middleware side of things just inspect the events after changing some
 parameters around
 
------------------------
------------------------
+[source, cpp]
+--------------------------------------------------------------------------------
+#include <rtosc/undo-history.h>
+--------------------------------------------------------------------------------
+
+
+Within middleware
+
+[source, cpp]
+--------------------------------------------------------------------------------
+UndoHistory undo_;
+
+...
+
+if(!strcmp("/undo_event"))
+    undo_.record_event(msg);
+
+...
+
+void undo(void)
+{
+    undo_.seekHistory(-1);
+}
+
+void redo(void)
+{
+    undo_.seekHistory(+1);
+}
+--------------------------------------------------------------------------------
+
+Within FLTK
+
+[source, cpp]
+--------------------------------------------------------------------------------
+global_key_bind(CTRL_Z, undo)
+global_key_bind(CTRL_Y, redo)
+--------------------------------------------------------------------------------
+
+And done.
+All parameter types now generate the needed events to undo/redo any event sent
+from a particular user interface.
+Multiple user interfaces can result in getting some forms of desync, but I don't
+think that an undo/redo system has any reasonable behavior in the cases when
+multiple interfaces manipulate the same parameters.
+
+Saving/Loading
+~~~~~~~~~~~~~~
+
+While larger programs should try to load and save their state through more
+complicated pointer swaps and pausing the world type approaches, there is more
+flexibility with a smaller app.
+
+MIDI Learning
+~~~~~~~~~~~~~
+
+Learning MIDI connections is a key feature of many applications, but this process
+is not quite as trivial as the last two.
+
+Before getting into the code, the behavior should be explained first.
+
+1. The user interface can request to learn a midi port via a non-realtime instance
+   by the OSC path
+2. The non-realtime instance notifies the realtime instance of this desire to learn
+   a port
+3. When an unrecognized MIDI port is received by the realtime instance, then this
+   port id (channel + CC) is forwarded to the non-realtime instance.
+4. The non-realtime instance uses reflection on the OSC path to derive information
+   on the type accepted, the scaling function, the minimum value, and the maximum
+   value.
+5. The non-realtime instance uses this information to generate a callback function
+   instance
+6. A pointer to this information is passed to the realtime instance along with the
+   CC to be used
+7. Future versions of the CC are passed into the callback which results in an OSC
+   message which is dispatched normally
+
+So, now that the basic flow is there, let's add in the MIDI learning support.
+
+Middleware
+
+[source, cpp]
+--------------------------------------------------------------------------------
+#include <rtosc/miditable.h>
+static rtosc::MidiMappernRT midi;
+
+//Callbacks
+
+void addMidiMap(const char *str);
+--------------------------------------------------------------------------------
+
+RealTime
+
+[source, cpp]
+--------------------------------------------------------------------------------
+#include <rtosc/miditable.h>
+static rtosc::MidiMapperRT midi;
+
+//Callbacks
+--------------------------------------------------------------------------------
+

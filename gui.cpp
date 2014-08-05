@@ -21,11 +21,11 @@ void gui_setup(void)
     for(int i=0; i<nsliders; ++i) {
         sliders[i] = new Fl_Slider(0,0,0,0);
         sliders[i]->type(FL_VERTICAL);
-        //Assert that it is a float based parameter
+        //Assert that it is a float based parameter <1>
 
-        //Fetch min/max
+        //Fetch min/max <2>
         
-        //Fetch description
+        //Fetch description <3>
     }
 
     win->show();
