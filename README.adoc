@@ -6,13 +6,13 @@ RtOSC Tutorial
 Tools Used
 ----------
 
-- jack
-- jack-osc
-- rtosc
-- oscdoc
-- jack_oscsend
-- jack_osclfo
-- oscprompt
+- http://jackaudio.org[jack]
+- http://github.com/ventosus/jack_osc[jack-osc]
+- http://github.com/fundamental/rtosc[rtosc]
+- http://github.com/7890/oscdoc[oscdoc]
+- http://github.com/fundamental/jack_osc_tools[jack_oscsend]
+- http://github.com/fundamental/jack_osc_tools[jack_osclfo]
+- http://github.com/fundamental/oscprompt[oscprompt]
 
 Objective
 ---------
@@ -99,9 +99,7 @@ though for the momst part the standard way is to use the following components
 - A sequencer for oscillator frequency and noise volume
 - A low frequency oscillator for the filter's frequency
 
-/////////////////////
-Block Diagram
-/////////////////////
+Note: TODO Add Block Diagram
 
 At this point the variables, constants, and parameters of the system should be
 defined, though there won't be any rtosc involvment yet.
@@ -158,9 +156,7 @@ The solution to this is the larger C++ API which is dedicated to making fixed
 moving on, I'd say it's reasonable to prove that this sort of dispatching does
 indeed work.
 
-//////////////
-Some example stuff for jack_oscsend and jack_osclfo
-//////////////
+NOTE: TODO Add Some example stuff for jack_oscsend and jack_osclfo
 
 
 
@@ -323,10 +319,12 @@ Thirdly, the ringbuffer will be emptied every call to process()
 CODE
 ////////////////////////////////////////////////////////////////////////////////
 
-Running the program will now result in a port getting dumpped to stdout
+Running the program will now result in a port getting dumped to stdout
 connecting oscprompt to this will now result in getting connected to the program
 from where values can be inspected and changed.
-Multiple insances of oscprompt can get connected without any issue.
+Multiple instances of oscprompt can get connected without any issue.
+
+NOTE: TODO Add oscprompt screenshot
 
 Documenting the API
 -------------------
