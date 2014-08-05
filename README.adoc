@@ -1,0 +1,401 @@
+RtOSC Tutorial
+==============
+:Author: Mark McCurry
+
+
+Tools Used
+----------
+
+- jack
+- jack-osc
+- rtosc
+- oscdoc
+- jack_oscsend
+- jack_osclfo
+- oscprompt
+
+Objective
+---------
+
+Create an OSC based sequencer/synth combo capiable of sounding vaugely like pink
+floyd's "On The Run" arppeggio
+
+Getting The Basics of Jack Running
+----------------------------------
+
+Before even writing any code for synthesis, the application must be able to talk
+to jack.
+
+.source[c]
+------------------------------------------------------------------
+#include <jack/jack.h>
+#include "jack_osc.h"
+
+jack_client_t *client;
+jack_port_t   *port;
+jack_port_t   *josc;
+
+int process(unsigned nframes, void *v)
+{
+    float *output = (float*) jack_port_get_buffer(port, nframes);
+
+    void *josc_buf = jack_port_get_buffer(josc, nframes);
+    jack_midi_event_t in_event;
+	jack_nframes_t event_index = 0;
+	jack_nframes_t event_count = jack_midi_get_event_count(josc_buf);
+	if(event_count)
+	{
+		for(unsigned i=0; i<event_count; i++)
+		{
+            //Do nothing
+		}
+	}
+
+
+    for(unsigned i=0; i<nframes; ++i)
+        output[i] = 0.0;
+    return 0;
+}
+
+int main()
+{
+	const char *client_name = "rtosc-tutorial";
+	jack_options_t options = JackNullOption;
+	jack_status_t status;
+
+	client = jack_client_open(client_name, options, &status, NULL);
+	if(!client)
+        return 1;
+
+	jack_set_process_callback(client, process, 0);
+	//jack_on_shutdown(client, jack_shutdown, 0);
+
+    Fs = jack_get_sample_rate(client);
+
+	port = jack_port_register (client, "out",
+					  JACK_DEFAULT_AUDIO_TYPE,
+					  JackPortIsOutput, 0);
+    josc = jack_port_register(client, "osc",
+                      JACK_DEFAULT_OSC_TYPE,
+                      JackPortIsInput, 0);
+
+    //Setup
+	jack_activate(client);
+
+    while(1)
+        sleep(1);
+}
+------------------------------------------------------------------
+
+Getting The Synthesis Setup
+---------------------------
+
+There are a number of ways to go about recreating this particilar sequence,
+though for the momst part the standard way is to use the following components
+
+- A square oscillator
+- A noise  oscillator
+- A low pass filter
+- A sequencer for oscillator frequency and noise volume
+- A low frequency oscillator for the filter's frequency
+
+/////////////////////
+Block Diagram
+/////////////////////
+
+At this point the variables, constants, and parameters of the system should be
+defined, though there won't be any rtosc involvment yet.
+
+- Whole System
+    - Parameter: Sampling Frequency
+- Oscillator
+    - Variable: Phase
+- Noise Generator
+    - Stateless
+- Sequencer
+    - Parameter: Frequency Table
+    - Parameter: Noise Level
+    - Parameter: Noise Decay Rate
+    - Parameter: Beats Per Minute
+    - Variable:  Cached/Normalized Parameters
+    - Variable:  Time
+- LFO
+    - Parameter: Frequency
+    - Parameter: Amplitude
+    - Variable:  Phase
+- Filter
+    - Parameter: Cutoff Frequency
+    - Parameter: Q Value
+    - Variable:  History Values
+
+With this information defined, the structs for all data can be defined with
+relative ease.
+
+
+/////////////
+Code Sample
+/////////////
+
+Now, a somewhat harsh square wave is produced with a slowly stepping sequence.
+Let's add some basic librtosc handling to it.
+Adding two addresses is simple enough but fairly verbose
+
+Basic RtOsc
+-----------
+
+-------------------
+if(!strcmp("/lfo/freq", msg) && !strcmp("f", rtosc_argument_string(msg)))
+asdf
+if(!strcmp("/lfo/amount", msg) && !strcmp("f", rtosc_argument_string(msg)))
+asdf
+if(!strcmp("/filter/f", msg) && !strcmp("f", rtosc_argument_string(msg)))
+asdf
+-------------------
+
+The solution to this is the larger C++ API which is dedicated to making fixed
+(or mostly fixed) dispatch hierarchies fairly easy to deal with, however before
+moving on, I'd say it's reasonable to prove that this sort of dispatching does
+indeed work.
+
+//////////////
+Some example stuff for jack_oscsend and jack_osclfo
+//////////////
+
+
+
+Ports And Hierarchies
+---------------------
+
+The RtOsc port system is a hierarchical dispatch system defined by a few key
+features:
+
+- Paths with argument specifiers and optional enumerations
+- Per Port Property Maps
+- Static Hierarchies
+- std::function based callbacks which permit the use of lambdas
+
+Before diving into the actual usage of the rtosc::Ports class, let's look at
+what a callback should do.
+
+A Callback is one that accepts an OSC message (no bundles here) and a reference
+to an instance of rtosc::RtData.
+
+RtData contains information about the call to the port including the current
+path, the object/struct/memory to be manipulated, the port that the callback is
+in, the number of matches that the osc path has made, and callbacks for
+replying/broadcasting responses to the OSC message.
+This class can be subclassed as needed to provide extra information.
+
+As a first port let's add the sequencer's bpm
+
+-------------------------------
+rtosc::Ports seq_ports =
+{
+    {"bpm:f", 0, 0, [](const char *msg, rtosc::RtData &d)
+        {
+            sequencer_t *seq = (sequencer_t*)d.obj;
+            seq->bpm = rtosc_argument(msg, 0).f;
+        }
+    }
+};
+
+rtosc::Ports ports =
+{
+    {"seq/", 0, &seq_ports, [](const char *msg, rtosc::RtData &d)
+        {
+            while(*msg != '/')
+                msg++;
+            msg++;
+            d.obj = &seq;
+            seq_ports.dispatch(msg, d);
+        }},
+};
+--------------------------------
+
+Next to the existing rtosc code add and the dispatching will work.
+
+------------------------
+rtosc::RtData d;
+ports.dispatch((char*)in_event.buffer+1, d);
+------------------------
+
+For a full hierarchy it is just a matter of repeating this pattern.
+This can be pretty repetitive however, so let's consider abstracting away some
+of that repetition for "ports".
+
+------------------------
+#define BasePort(name) {#name "/", 0, &name##_ports, [](const char *msg, \
+                       rtosc::RtData &d)\
+                       {while(*msg != '/') msg++; msg++; d.obj = &name; \
+                       name##_ports.dispatch(msg,d);}}
+
+rtosc::Ports ports = {
+    BasePort(seq),
+};
+------------------------
+
+Now adding the additional base ports is rather trivial.
+This idea has been encapsulated in <rtosc/port-sugar.h> which defines a number
+of similar (though somewhat more robust) macros.
+
+Fleshing out the various port tables, we are left with:
+
+----------------------------------------------------------
+#define rObject sequencer_t
+rtosc::Ports seq_ports = {
+    rArrayF(freq, 8),
+    rParamF(noise_level),
+    rParamF(noise_decay),
+    rParamF(bpm),
+};
+#undef rObject
+
+#define rObject lfo_t
+rtosc::Ports lfo_ports = {
+    rParamF(freq),
+    rParamF(amount),
+};
+#undef rObject
+
+#define rObject lpf_t
+rtosc::Ports filter_ports = {
+    rParamF(f),
+    rParamF(Q),
+};
+#undef rObject
+
+#define BasePort(name) {#name "/", 0, &name##_ports, [](const char *msg, \
+                       rtosc::RtData &d)\
+                       {while(*msg != '/') msg++; msg++; d.obj = &name; \
+                       name##_ports.dispatch(msg,d);}}
+
+rtosc::Ports ports = {
+    BasePort(seq),
+    BasePort(lfo),
+    BasePort(filter),
+};
+----------------------------------------------------------
+
+This might seem like an effort to add too much magic in, but I'd say this sort
+of definition makes for easier to read and modify code within a task which can
+be very repetitive to perform.
+This setup also leaves the existing structures entirely alone which permits for
+very easy retrofitting of RtOsc onto existing code.
+
+
+Escaping The Realtime Thread
+----------------------------
+
+As of so far everything has more or less existed on the single thread model, but
+upgrading the system for use in a mutithreaded application is relatively simple.
+Virtually all of the default call in RtOsc are reentrant and when possible they
+tend to be pure functions.
+The main bit of trickyness is moving OSC messages from the user interface to the
+realtime thread.
+This is accomplished with a thin wrapper around JACK's implementation of a
+lock/wait free ringbuffer.
+Depending on the complexity of the application it might make sense to route all
+messages through some sort of middleware or it might make sense to write all
+events from the user interface directly into the connecting ringbuffer.
+
+This tutorial will consider the case of some middleware using liblo to connect
+the program to some arbitrary external UI (or for the sake of avoiding any GUI
+programming OSCprompt).
+
+///////////////////////
+ringbuffer definitions
+liblo queries
+handlers for echo stuff
+///////////////////////
+
+To support this on the realtime side, a few modifications will be made.
+First, an echo port will be added to help the middleware track the flow of
+messages.
+Secondly, the RtData object will be subclassed to permit listening to replies.
+Thirdly, the ringbuffer will be emptied every call to process()
+
+
+/////////////////
+CODE
+//////////////
+
+Running the program will now result in a port getting dumpped to stdout
+connecting oscprompt to this will now result in getting connected to the program
+from where values can be inspected and changed.
+Multiple insances of oscprompt can get connected without any issue.
+
+Documenting the API
+-------------------
+
+While moving around the program with oscprompt you may have noticed that the
+right window was somewhat bare.
+This is due to the fact that none of the program's ports have been documented
+thus far.
+The ports use doubly nulled c strings to store the parameters in a consise and
+macro friendly way, however this is something that you normally don't need to
+deal with due to macros like rMap(field, value) or rProp(field).
+For the basic macros involved in the port definitions these properties can just
+be put at the end of the macro call before the documentation string.
+With this in mind, let's document things
+
+----------------------------------------------------------
+#define Units(x) rMap(units, x)
+#define UnitLess rProp(unitless)
+#define rObject sequencer_t
+rtosc::Ports seq_ports = {
+    rArrayF(freq, 8, rLogarithmic(0.1, 10e3), Units(Hz), "Frequency"),
+    rParamF(noise_level, rLinear(0, 3), UnitLess, "White Noise Peak Gain"),
+    rParamF(noise_decay, rLinear(1e-4,1), UnitLess, "Noise Decay Over Step"),
+    rParamF(bpm, rLinear(0,1000), Units(bpm), "Beats Per Minute"),
+};
+#undef rObject
+
+#define rObject lfo_t
+rtosc::Ports lfo_ports = {
+    rParamF(freq, rLogarithmic(0.1, 1e3), Units(Hz), "Frequency"),
+    rParamF(amount, rLinear(0,8), UnitLess, "LFO Strength"),
+};
+#undef rObject
+
+#define rObject lpf_t
+rtosc::Ports filter_ports = {
+    rParamF(f, rLogarithmic(0.1, 10e3), "Cutoff Frequency"),
+    rParamF(Q, rLinear(0,5), "Q"),
+};
+#undef rObject
+
+#define BasePort(name,doc) {#name "/", rDoc(doc), &name##_ports, [](const char *msg, \
+                       rtosc::RtData &d)\
+                       {while(*msg != '/') msg++; msg++; d.obj = &name; \
+                       name##_ports.dispatch(msg,d);}}
+
+rtosc::Ports ports = {
+    BasePort(seq, "Sequencer"),
+    BasePort(lfo, "Low Frequency Oscillator"),
+    BasePort(filter, "Low Pass Filter"),
+};
+----------------------------------------------------------
+
+Now the extra information will end up showing up in oscprompt, however this is
+entangled with the dynamic reflection which is less than ideal.
+This is where the tool oscdoc comes into play.
+oscdoc is an XSLT documentation tool for OSC based APIs and rtosc supports
+dumping ports to the input format.
+
+To do so, let's modify the start of main() to
+
+-------------------
+int main(int argc, char **argv)
+{
+    if(argc == 3 && !strcmp(argv[1], "--dump-oscdoc")) {
+        rtosc::ports_to_oscdoc(ports, argv[2]);
+        return 0;
+    }
+-------------------
+
+------------
+./rtosc-tutorial --dump-oscdoc oscdoc-file.xml
+bla bla
+------------
+
+Now let
