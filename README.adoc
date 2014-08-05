@@ -189,7 +189,7 @@ This class can be subclassed as needed to provide extra information.
 As a first port let's add the sequencer's bpm
 
 [source,c++]
--------------------------------
+--------------------------------------------------------------------------------
 rtosc::Ports seq_ports =
 {
     {"bpm:f", 0, 0, [](const char *msg, rtosc::RtData &d)
@@ -211,7 +211,7 @@ rtosc::Ports ports =
             seq_ports.dispatch(msg, d);
         }},
 };
---------------------------------
+--------------------------------------------------------------------------------
 
 Next to the existing rtosc code add and the dispatching will work.
 
@@ -316,9 +316,9 @@ Secondly, the RtData object will be subclassed to permit listening to replies.
 Thirdly, the ringbuffer will be emptied every call to process()
 
 
-/////////////////
+////////////////////////////////////////////////////////////////////////////////
 CODE
-//////////////
+////////////////////////////////////////////////////////////////////////////////
 
 Running the program will now result in a port getting dumpped to stdout
 connecting oscprompt to this will now result in getting connected to the program
