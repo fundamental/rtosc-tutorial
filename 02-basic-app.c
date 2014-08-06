@@ -5,8 +5,6 @@
 #include <math.h>
 #include <assert.h>
 #include <rtosc/rtosc.h>
-#include <rtosc/ports.h>
-#include <rtosc/port-sugar.h>
 #include "jack_osc.h"
 //Global
 static float Fs=0.0;
@@ -73,7 +71,7 @@ void init_osc(struct osc_t *osc)
     osc->state = 0.0;
 }
 
-void gen_square(float *out, float *in, osc_t *osc, unsigned nframes)
+void gen_square(float *out, float *in, struct osc_t *osc, unsigned nframes)
 {
     for(unsigned i=0; i<nframes; ++i) {
         out[i] = osc->state > 0.5 ? 0.5 : -0.5;
@@ -85,14 +83,14 @@ void gen_square(float *out, float *in, osc_t *osc, unsigned nframes)
 
 
 //Sequencer
-void update_seq(sequencer_t *seq)
+void update_seq(struct sequencer_t *seq)
 {
     for(int i=0; i<8; ++i)
         seq->norm_freq[i] = seq->freq[i]/Fs;
     seq->noise_decay_internal = powf(seq->noise_decay, seq->bpm/(Fs*60.0));
 }
 
-void init_seq(sequencer_t *seq)
+void init_seq(struct sequencer_t *seq)
 {
     for(int i=0; i<8; ++i)
         seq->freq[i] = 80*i;
@@ -104,7 +102,7 @@ void init_seq(sequencer_t *seq)
     update_seq(seq);
 }
 
-void gen_seq(float *out_f, float *out_amp, sequencer_t *seq, unsigned nframes)
+void gen_seq(float *out_f, float *out_amp, struct sequencer_t *seq, unsigned nframes)
 {
     update_seq(seq);
     const float dt = seq->bpm/(Fs*60);
@@ -124,13 +122,13 @@ void gen_seq(float *out_f, float *out_amp, sequencer_t *seq, unsigned nframes)
 }
 
 //LFO
-void init_lfo(lfo_t *lfo)
+void init_lfo(struct lfo_t *lfo)
 {
     lfo->freq   = 1.0;
     lfo->amount = 0.2;
 }
 
-void gen_lfo(float *out, lfo_t *lfo, unsigned nframes)
+void gen_lfo(float *out, struct lfo_t *lfo, unsigned nframes)
 {
     const float dt = lfo->freq/Fs;
 
@@ -138,12 +136,12 @@ void gen_lfo(float *out, lfo_t *lfo, unsigned nframes)
         lfo->state += dt;
         if(lfo->state > 1.0)
             lfo->state -= 1.0;
-        out[i] = sinf(2*M_PI*lfo->state);
+        out[i] = sinf(2*(3.14159)*lfo->state);
     }
 }
 
 //LPF
-void init_lpf(lpf_t *lpf)
+void init_lpf(struct lpf_t *lpf)
 {
     lpf->f = 8e3;
     lpf->Q = 2.0;
@@ -151,7 +149,7 @@ void init_lpf(lpf_t *lpf)
     lpf->z2 = 0.0;
 }
 
-void do_filter(float *out, float *in, float *in_f, lpf_t *lpf, unsigned nframes)
+void do_filter(float *out, float *in, float *in_f, struct lpf_t *lpf, unsigned nframes)
 {
     float base_freq = lpf->f;
     for(unsigned i=0; i<nframes; ++i) {
@@ -194,6 +192,7 @@ jack_port_t   *josc;
 
 int process(unsigned nframes, void *v)
 {
+    (void) v;
     float seq_sqr[nframes];
     float seq_noise[nframes];
     float sqr[nframes];
@@ -204,7 +203,6 @@ int process(unsigned nframes, void *v)
 	
     void *josc_buf = jack_port_get_buffer(josc, nframes);
     jack_midi_event_t in_event;
-	jack_nframes_t event_index = 0;
 	jack_nframes_t event_count = jack_midi_get_event_count(josc_buf);
 	if(event_count)
 	{
@@ -251,7 +249,7 @@ int main()
     init_osc(&osc);
     init_seq(&seq);
     init_lfo(&lfo);
-    init_lpf(&lpf);
+    init_lpf(&filter);
 
 	jack_activate(client);
 

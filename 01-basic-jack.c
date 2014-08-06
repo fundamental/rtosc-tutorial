@@ -9,17 +9,18 @@ float Fs;
 
 int process(unsigned nframes, void *v)
 {
+    (void) v;
     float *output = (float*) jack_port_get_buffer(port, nframes);
 
     void *josc_buf = jack_port_get_buffer(josc, nframes);
     jack_midi_event_t in_event;
-	jack_nframes_t event_index = 0;
 	jack_nframes_t event_count = jack_midi_get_event_count(josc_buf);
 	if(event_count)
 	{
 		for(unsigned i=0; i<event_count; i++)
 		{
             //Do nothing
+            (void) in_event;
 		}
 	}
 

@@ -250,6 +250,7 @@ jack_port_t   *josc;
 
 int process(unsigned nframes, void *v)
 {
+    (void) v;
     float seq_sqr[nframes];
     float seq_noise[nframes];
     float sqr[nframes];
@@ -260,7 +261,6 @@ int process(unsigned nframes, void *v)
 	
     void *josc_buf = jack_port_get_buffer(josc, nframes);
     jack_midi_event_t in_event;
-	jack_nframes_t event_index = 0;
 	jack_nframes_t event_count = jack_midi_get_event_count(josc_buf);
 	if(event_count)
 	{
@@ -309,7 +309,7 @@ int main()
     init_osc(&osc);
     init_seq(&seq);
     init_lfo(&lfo);
-    init_lpf(&lpf);
+    init_lpf(&filter);
 
 	jack_activate(client);
 
