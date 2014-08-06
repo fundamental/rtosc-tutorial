@@ -246,11 +246,17 @@ This tutorial will consider the case of some middleware using liblo to connect
 the program to some arbitrary external UI (or for the sake of avoiding any GUI
 programming OSCprompt).
 
-///////////////////////
-ringbuffer definitions
-liblo queries
-handlers for echo stuff
-///////////////////////
+[source, cpp]
+--------------------------------------------------------------------------------
+#include <rtosc/thread-link.h>
+
+rtosc::ThreadLink bToU uToB;
+
+void liblo_callback();
+...
+{"echo", 0, 0, [](const char *msg, RtData &d){
+}}
+--------------------------------------------------------------------------------
 
 To support this on the realtime side, a few modifications will be made.
 First, an echo port will be added to help the middleware track the flow of
@@ -439,6 +445,55 @@ Saving/Loading
 While larger programs should try to load and save their state through more
 complicated pointer swaps and pausing the world type approaches, there is more
 flexibility with a smaller app.
+
+Adding this to the port hierarchy is trivial.
+
+[source,cpp]
+--------------------------------------------------------------------------------
+#include <rtosc/subtree-serialize.h>
+...
+{"save:", 0, 0, [](const char *, RtData &d) {
+        char buffer[2048];
+        size_t res_size = subtree_serialize(buffer, 2048, NULL, &ports);
+        d.reply("/save_data", "b", res_size, buffer);
+    }},
+{"load:b", 0, 0, [](const char *msg, RtData &) {
+        rtosc_blob_t b  = rtosc_argument(msg, 0).b;
+        size_t res_size = subtree_deserialize(b.data, b.len, NULL, &ports);
+    }},
+--------------------------------------------------------------------------------
+
+Adding the support to the GUI is slightly more complicated, but still fairly
+simple.
+
+
+[source,cpp]
+--------------------------------------------------------------------------------
+const char *save_keys = "1234";
+const char *load_keya = "!@#$";
+std::queue<short> save_queue;
+rtosc_blob_t saves[4];
+
+//receive event
+assert(save_queue.size() != 0);
+int addr = save_queue.pop();
+delete [] saves[addr].data;
+saves[addr] = new char[event.len];
+memcpy(save.data, event.data, event.len);
+save.len = event.len;
+
+//On load request
+if(save[addr].len) {
+    uToB.write("/load", "b", save[addr].len, save[addr].data);
+}
+
+//On save request
+save_queue.push_back(addr);
+uToB.write("/save");
+--------------------------------------------------------------------------------
+
+Now using 1234 and SHIFT+1234 permits loading and saving the state of the whole
+program.
 
 MIDI Learning
 ~~~~~~~~~~~~~
