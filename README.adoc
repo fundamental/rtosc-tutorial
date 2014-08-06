@@ -43,7 +43,7 @@ though for the momst part the standard way is to use the following components
 - A sequencer for oscillator frequency and noise volume
 - A low frequency oscillator for the filter's frequency
 
-Note: TODO Add Block Diagram
+image::dsp-flow.png[]
 
 At this point the variables, constants, and parameters of the system should be
 defined, though there won't be any rtosc involvment yet.

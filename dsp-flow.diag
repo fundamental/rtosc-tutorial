@@ -1,0 +1,12 @@
+blockdiag {
+   A [label = "Sequencer", color = "red"];
+   B [label = "Square Osc", color = "green"];
+   C [label = "Noise  Osc", color = "green"];
+   D [label = "Mixer"];
+   E [label = "LFO", color = "red"];
+   F [label = "Filter", color = "teal"];
+
+   A -> B -> D ->F;
+   A -> C -> D;
+   E -> F;
+}
