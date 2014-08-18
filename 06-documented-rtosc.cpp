@@ -8,6 +8,7 @@
 #include <rtosc/ports.h>
 #include <rtosc/port-sugar.h>
 #include <rtosc/thread-link.h>
+#include <fstream>
 #include "jack_osc.h"
 //Global
 static float Fs=0.0;
@@ -300,10 +301,21 @@ int process(unsigned nframes, void *v)
     return 0;
 }
 
-int main()
+extern void middleware_init(void);
+extern void middleware_tick(void);
+
+int main(int argc, char **argv)
 {
-    extern void middleware_init(void);
-    extern void middleware_tick(void);
+    if(argc == 3 && !strcmp(argv[1], "--dump-oscdoc")) {
+        std::ofstream file(argv[2], std::ofstream::out);
+        rtosc::OscDocFormatter formatter{&ports, "rtosc-tutorial",
+            "http://example.com/", "http://example.com/",
+                "John", "Smith"};
+        file << formatter;
+        file.close();
+    }
+
+
     middleware_init();
 	const char *client_name = "rtosc-tutorial";
 	jack_options_t options = JackNullOption;
