@@ -143,7 +143,7 @@ Next update the existing rtosc code to add the dispatching:
 
 [source,cpp]
 --------------------------------------------------------------------------------
-include::03-basic-rtosc.cpp[tag::rt_dispatch]
+include::03-basic-rtosc.cpp[tag=rt_dispatch]
 --------------------------------------------------------------------------------
 
 For a full hierarchy it is just a matter of repeating this pattern.
@@ -170,7 +170,7 @@ Fleshing out the various port tables, we are left with:
 
 [source,cpp]
 --------------------------------------------------------------------------------
-include::04-macro-rtosc.cpp[tab::ports]
+include::04-macro-rtosc.cpp[tag=ports]
 --------------------------------------------------------------------------------
 
 This might seem like an effort to add too much magic in, but I'd say this sort
