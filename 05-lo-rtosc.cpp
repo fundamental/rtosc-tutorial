@@ -7,12 +7,13 @@
 #include <rtosc/rtosc.h>
 #include <rtosc/ports.h>
 #include <rtosc/port-sugar.h>
+#include <rtosc/thread-link.h>
 #include "jack_osc.h"
 //Global
 static float Fs=0.0;
+rtosc::ThreadLink bToU(1024,20), uToB(1024,20);
 
 //Type Definition
-// tag::snippet[]
 struct osc_t
 {
     //Internal
@@ -53,7 +54,6 @@ struct lpf_t
     //Internal
     float z1, z2;
 };
-// end::snippet[]
 
 //Noise Generator
 float randf(void)
@@ -85,22 +85,6 @@ void gen_square(float *out, float *in, osc_t *osc, unsigned nframes)
 
 
 //Sequencer
-#define rObject sequencer_t
-// tag::seq_port[]
-rtosc::Ports seq_ports = {
-    {"bpm:f", 0, 0, [](const char *msg, rtosc::RtData &d)
-        {
-            sequencer_t *seq = (sequencer_t*)d.obj;
-            seq->bpm = rtosc_argument(msg, 0).f;
-        }
-    },
-    // end::seq_port[]
-    rArrayF(freq, 8),
-    rParamF(noise_level),
-    rParamF(noise_decay),
-};
-#undef rObject
-
 void update_seq(sequencer_t *seq)
 {
     for(int i=0; i<8; ++i)
@@ -141,13 +125,6 @@ void gen_seq(float *out_f, float *out_amp, sequencer_t *seq, unsigned nframes)
 
 //LFO
 
-#define rObject lfo_t
-rtosc::Ports lfo_ports = {
-    rParamF(freq),
-    rParamF(amount),
-};
-#undef rObject
-
 void init_lfo(lfo_t *lfo)
 {
     lfo->freq   = 1.0;
@@ -168,12 +145,6 @@ void gen_lfo(float *out, lfo_t *lfo, unsigned nframes)
 
 //LPF
 
-#define rObject lpf_t
-rtosc::Ports filter_ports = {
-    rParamF(f),
-    rParamF(Q),
-};
-#undef rObject
 
 void init_lpf(lpf_t *lpf)
 {
@@ -214,38 +185,69 @@ void do_sum(float *out, float *in1, float *in2, unsigned nframes)
             out[i] = -1.0;
 }
 
+//Dispatch Container
+// tag::rtdata-impl[]
+class RtDataImpl: public rtosc::RtData
+{
+    public:
+        RtDataImpl(void)
+        {
+            memset(internal_buffer, 0, sizeof(internal_buffer));
+            loc      = internal_buffer;
+            loc_size = sizeof(internal_buffer);
+            obj      = NULL;
+        }
+
+        virtual void reply(const char *msg) override
+        {
+            bToU.raw_write(msg);
+        }
+    private:
+        char internal_buffer[256];
+};
+// end::rtdata-impl[]
 
 struct osc_t osc;
 struct sequencer_t seq;
 struct lfo_t lfo;
 struct lpf_t filter;
-// tag::port_base[]
+
+
+#define rObject sequencer_t
+rtosc::Ports seq_ports = {
+    rArrayF(freq, 8),
+    rParamF(noise_level),
+    rParamF(noise_decay),
+    rParamF(bpm),
+};
+#undef rObject
+
+#define rObject lfo_t
+rtosc::Ports lfo_ports = {
+    rParamF(freq),
+    rParamF(amount),
+};
+#undef rObject
+
+#define rObject lpf_t
+rtosc::Ports filter_ports = {
+    rParamF(f),
+    rParamF(Q),
+};
+#undef rObject
+
+#define BasePort(name) {#name "/", 0, &name##_ports, [](const char *msg, \
+                       rtosc::RtData &d)\
+                       {while(*msg != '/') msg++; msg++; d.obj = &name; \
+                       name##_ports.dispatch(msg,d);}}
+
 rtosc::Ports ports = {
-    {"seq/", 0, &seq_ports, [](const char *msg, rtosc::RtData &d)
-        {
-            while(*msg != '/')
-                msg++;
-            msg++;
-            d.obj = &seq;
-            seq_ports.dispatch(msg, d);
-        }},
-    // end::port_base[]
-    {"lfo/", 0, &lfo_ports, [](const char *msg, rtosc::RtData &d)
-        {
-            while(*msg != '/')
-                msg++;
-            msg++;
-            d.obj = &lfo;
-            lfo_ports.dispatch(msg, d);
-        }},
-    {"filter/", 0, &filter_ports, [](const char *msg, rtosc::RtData &d)
-        {
-            while(*msg != '/')
-                msg++;
-            msg++;
-            d.obj = &filter;
-            filter_ports.dispatch(msg, d);
-        }},
+    BasePort(seq),
+    BasePort(lfo),
+    BasePort(filter),
+// tag::echo-port[]
+    {"echo", 0 , 0, [](const char *m, rtosc::RtData &d) {d.reply(m-1);}},
+// end::echo-port[]
 };
 
 jack_client_t *client;
@@ -266,18 +268,24 @@ int process(unsigned nframes, void *v)
     void *josc_buf = jack_port_get_buffer(josc, nframes);
     jack_midi_event_t in_event;
 	jack_nframes_t event_count = jack_midi_get_event_count(josc_buf);
-    // tag::rt_dispatch[]
+    // tag::buf-read[]
 	if(event_count)
 	{
 		for(unsigned i=0; i<event_count; i++)
 		{
 			jack_midi_event_get(&in_event, josc_buf, i);
             assert(*in_event.buffer == '/');
-            rtosc::RtData d;
+            RtDataImpl d;
             ports.dispatch((char*)in_event.buffer+1, d);
 		}
 	}
-    // end::rt_dispatch[]
+
+    while(uToB.hasNext())
+    {
+        RtDataImpl d;
+        ports.dispatch(uToB.read(), d);
+    }
+    // end::buf-read
 
 
     gen_seq(seq_sqr, seq_noise, &seq, nframes);
@@ -291,6 +299,9 @@ int process(unsigned nframes, void *v)
 
 int main()
 {
+    extern void middleware_init(void);
+    extern void middleware_tick(void);
+    middleware_init();
 	const char *client_name = "rtosc-tutorial";
 	jack_options_t options = JackNullOption;
 	jack_status_t status;
@@ -320,5 +331,5 @@ int main()
 	jack_activate(client);
 
     while(1)
-        sleep(1);
+        middleware_tick();
 }

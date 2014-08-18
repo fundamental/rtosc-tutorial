@@ -12,7 +12,6 @@
 static float Fs=0.0;
 
 //Type Definition
-// tag::snippet[]
 struct osc_t
 {
     //Internal
@@ -53,7 +52,6 @@ struct lpf_t
     //Internal
     float z1, z2;
 };
-// end::snippet[]
 
 //Noise Generator
 float randf(void)
@@ -85,22 +83,6 @@ void gen_square(float *out, float *in, osc_t *osc, unsigned nframes)
 
 
 //Sequencer
-#define rObject sequencer_t
-// tag::seq_port[]
-rtosc::Ports seq_ports = {
-    {"bpm:f", 0, 0, [](const char *msg, rtosc::RtData &d)
-        {
-            sequencer_t *seq = (sequencer_t*)d.obj;
-            seq->bpm = rtosc_argument(msg, 0).f;
-        }
-    },
-    // end::seq_port[]
-    rArrayF(freq, 8),
-    rParamF(noise_level),
-    rParamF(noise_decay),
-};
-#undef rObject
-
 void update_seq(sequencer_t *seq)
 {
     for(int i=0; i<8; ++i)
@@ -141,13 +123,6 @@ void gen_seq(float *out_f, float *out_amp, sequencer_t *seq, unsigned nframes)
 
 //LFO
 
-#define rObject lfo_t
-rtosc::Ports lfo_ports = {
-    rParamF(freq),
-    rParamF(amount),
-};
-#undef rObject
-
 void init_lfo(lfo_t *lfo)
 {
     lfo->freq   = 1.0;
@@ -168,12 +143,6 @@ void gen_lfo(float *out, lfo_t *lfo, unsigned nframes)
 
 //LPF
 
-#define rObject lpf_t
-rtosc::Ports filter_ports = {
-    rParamF(f),
-    rParamF(Q),
-};
-#undef rObject
 
 void init_lpf(lpf_t *lpf)
 {
@@ -214,39 +183,47 @@ void do_sum(float *out, float *in1, float *in2, unsigned nframes)
             out[i] = -1.0;
 }
 
-
 struct osc_t osc;
 struct sequencer_t seq;
 struct lfo_t lfo;
 struct lpf_t filter;
-// tag::port_base[]
-rtosc::Ports ports = {
-    {"seq/", 0, &seq_ports, [](const char *msg, rtosc::RtData &d)
-        {
-            while(*msg != '/')
-                msg++;
-            msg++;
-            d.obj = &seq;
-            seq_ports.dispatch(msg, d);
-        }},
-    // end::port_base[]
-    {"lfo/", 0, &lfo_ports, [](const char *msg, rtosc::RtData &d)
-        {
-            while(*msg != '/')
-                msg++;
-            msg++;
-            d.obj = &lfo;
-            lfo_ports.dispatch(msg, d);
-        }},
-    {"filter/", 0, &filter_ports, [](const char *msg, rtosc::RtData &d)
-        {
-            while(*msg != '/')
-                msg++;
-            msg++;
-            d.obj = &filter;
-            filter_ports.dispatch(msg, d);
-        }},
+
+
+// tag::ports[]
+#define rObject sequencer_t
+rtosc::Ports seq_ports = {
+    rArrayF(freq, 8),
+    rParamF(noise_level),
+    rParamF(noise_decay),
+    rParamF(bpm),
 };
+#undef rObject
+
+#define rObject lfo_t
+rtosc::Ports lfo_ports = {
+    rParamF(freq),
+    rParamF(amount),
+};
+#undef rObject
+
+#define rObject lpf_t
+rtosc::Ports filter_ports = {
+    rParamF(f),
+    rParamF(Q),
+};
+#undef rObject
+
+#define BasePort(name) {#name "/", 0, &name##_ports, [](const char *msg, \
+                       rtosc::RtData &d)\
+                       {while(*msg != '/') msg++; msg++; d.obj = &name; \
+                       name##_ports.dispatch(msg,d);}}
+
+rtosc::Ports ports = {
+    BasePort(seq),
+    BasePort(lfo),
+    BasePort(filter),
+};
+// end::ports[]
 
 jack_client_t *client;
 jack_port_t   *port;
@@ -266,7 +243,6 @@ int process(unsigned nframes, void *v)
     void *josc_buf = jack_port_get_buffer(josc, nframes);
     jack_midi_event_t in_event;
 	jack_nframes_t event_count = jack_midi_get_event_count(josc_buf);
-    // tag::rt_dispatch[]
 	if(event_count)
 	{
 		for(unsigned i=0; i<event_count; i++)
@@ -277,7 +253,6 @@ int process(unsigned nframes, void *v)
             ports.dispatch((char*)in_event.buffer+1, d);
 		}
 	}
-    // end::rt_dispatch[]
 
 
     gen_seq(seq_sqr, seq_noise, &seq, nframes);

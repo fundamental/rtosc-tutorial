@@ -29,11 +29,17 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++11")
 add_executable(01-tutorial 01-basic-jack.c)
 add_executable(02-tutorial 02-basic-app.c)
 add_executable(03-tutorial 03-basic-rtosc.cpp)
+add_executable(04-tutorial 04-macro-rtosc.cpp)
+add_executable(05-tutorial 05-lo-rtosc.cpp 05-middleware)
+
 
 #Linker Flags
 target_link_libraries(01-tutorial ${JACK_LIBRARIES})
 target_link_libraries(02-tutorial ${JACK_LIBRARIES} m)
 target_link_libraries(03-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp)
+target_link_libraries(04-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp)
+target_link_libraries(05-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+                                  ${LIBLO_LIBRARIES})
 
 
 #Build Documentation (TODO)

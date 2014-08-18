@@ -131,42 +131,26 @@ As a first port let's add the sequencer's bpm
 
 [source,cpp]
 --------------------------------------------------------------------------------
-rtosc::Ports seq_ports =
-{
-    {"bpm:f", 0, 0, [](const char *msg, rtosc::RtData &d)
-        {
-            sequencer_t *seq = (sequencer_t*)d.obj;
-            seq->bpm = rtosc_argument(msg, 0).f;
-        }
-    }
+include::03-basic-rtosc.cpp[tag=seq_port]
 };
 
-rtosc::Ports ports =
-{
-    {"seq/", 0, &seq_ports, [](const char *msg, rtosc::RtData &d)
-        {
-            while(*msg != '/')
-                msg++;
-            msg++;
-            d.obj = &seq;
-            seq_ports.dispatch(msg, d);
-        }},
+include::03-basic-rtosc.cpp[tag=port_base]
 };
 --------------------------------------------------------------------------------
 
-Next to the existing rtosc code add and the dispatching will work.
+Next update the existing rtosc code to add the dispatching:
 
-------------------------
-rtosc::RtData d;
-ports.dispatch((char*)in_event.buffer+1, d);
-------------------------
+[source,cpp]
+--------------------------------------------------------------------------------
+include::03-basic-rtosc.cpp[tag::rt_dispatch]
+--------------------------------------------------------------------------------
 
 For a full hierarchy it is just a matter of repeating this pattern.
 This can be pretty repetitive however, so let's consider abstracting away some
 of that repetition for "ports".
 
 [source,cpp]
-------------------------
+--------------------------------------------------------------------------------
 #define BasePort(name) {#name "/", 0, &name##_ports, [](const char *msg, \
                        rtosc::RtData &d)\
                        {while(*msg != '/') msg++; msg++; d.obj = &name; \
@@ -175,7 +159,7 @@ of that repetition for "ports".
 rtosc::Ports ports = {
     BasePort(seq),
 };
-------------------------
+--------------------------------------------------------------------------------
 
 Now adding the additional base ports is rather trivial.
 This idea has been encapsulated in <rtosc/port-sugar.h> which defines a number
@@ -184,41 +168,9 @@ of similar (though somewhat more robust) macros.
 Fleshing out the various port tables, we are left with:
 
 [source,cpp]
-----------------------------------------------------------
-#define rObject sequencer_t
-rtosc::Ports seq_ports = {
-    rArrayF(freq, 8),
-    rParamF(noise_level),
-    rParamF(noise_decay),
-    rParamF(bpm),
-};
-#undef rObject
-
-#define rObject lfo_t
-rtosc::Ports lfo_ports = {
-    rParamF(freq),
-    rParamF(amount),
-};
-#undef rObject
-
-#define rObject lpf_t
-rtosc::Ports filter_ports = {
-    rParamF(f),
-    rParamF(Q),
-};
-#undef rObject
-
-#define BasePort(name) {#name "/", 0, &name##_ports, [](const char *msg, \
-                       rtosc::RtData &d)\
-                       {while(*msg != '/') msg++; msg++; d.obj = &name; \
-                       name##_ports.dispatch(msg,d);}}
-
-rtosc::Ports ports = {
-    BasePort(seq),
-    BasePort(lfo),
-    BasePort(filter),
-};
-----------------------------------------------------------
+--------------------------------------------------------------------------------
+include::04-macro-rtosc.cpp[tab::ports]
+--------------------------------------------------------------------------------
 
 This might seem like an effort to add too much magic in, but I'd say this sort
 of definition makes for easier to read and modify code within a task which can
@@ -248,26 +200,32 @@ programming OSCprompt).
 
 [source, cpp]
 --------------------------------------------------------------------------------
-#include <rtosc/thread-link.h>
-
-rtosc::ThreadLink bToU uToB;
-
-void liblo_callback();
-...
-{"echo", 0, 0, [](const char *msg, RtData &d){
-}}
+include::05-middleware.cpp[]
 --------------------------------------------------------------------------------
 
 To support this on the realtime side, a few modifications will be made.
 First, an echo port will be added to help the middleware track the flow of
 messages.
+
+[source, cpp]
+--------------------------------------------------------------------------------
+include::05-lo-rtosc.cpp[tag=rtdata-impl]
+--------------------------------------------------------------------------------
+
 Secondly, the RtData object will be subclassed to permit listening to replies.
+
+[source, cpp]
+--------------------------------------------------------------------------------
+include::05-lo-rtosc.cpp[tag=echo-port]
+--------------------------------------------------------------------------------
+
 Thirdly, the ringbuffer will be emptied every call to process()
 
+[source, cpp]
+--------------------------------------------------------------------------------
+include::05-lo-rtosc.cpp[tag=buf-read]
+--------------------------------------------------------------------------------
 
-////////////////////////////////////////////////////////////////////////////////
-CODE
-////////////////////////////////////////////////////////////////////////////////
 
 Running the program will now result in a port getting dumped to stdout
 connecting oscprompt to this will now result in getting connected to the program
