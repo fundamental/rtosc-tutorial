@@ -31,6 +31,7 @@ add_executable(02-tutorial 02-basic-app.c)
 add_executable(03-tutorial 03-basic-rtosc.cpp)
 add_executable(04-tutorial 04-macro-rtosc.cpp)
 add_executable(05-tutorial 05-lo-rtosc.cpp 05-middleware)
+add_executable(06-tutorial 06-documented-rtosc.cpp 06-middleware)
 
 
 #Linker Flags
@@ -39,6 +40,8 @@ target_link_libraries(02-tutorial ${JACK_LIBRARIES} m)
 target_link_libraries(03-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp)
 target_link_libraries(04-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp)
 target_link_libraries(05-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+                                  ${LIBLO_LIBRARIES})
+target_link_libraries(06-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
                                   ${LIBLO_LIBRARIES})
 
 

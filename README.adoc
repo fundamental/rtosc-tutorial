@@ -1,6 +1,7 @@
 RtOSC Tutorial
 ==============
 :Author: Mark McCurry
+:source-highlighter: pygments
 
 
 Tools Used
@@ -248,44 +249,10 @@ For the basic macros involved in the port definitions these properties can just
 be put at the end of the macro call before the documentation string.
 With this in mind, let's document things
 
-[source,cpp]
-----------------------------------------------------------
-#define Units(x) rMap(units, x)
-#define UnitLess rProp(unitless)
-#define rObject sequencer_t
-rtosc::Ports seq_ports = {
-    rArrayF(freq, 8, rLogarithmic(0.1, 10e3), Units(Hz), "Frequency"),
-    rParamF(noise_level, rLinear(0, 3), UnitLess, "White Noise Peak Gain"),
-    rParamF(noise_decay, rLinear(1e-4,1), UnitLess, "Noise Decay Over Step"),
-    rParamF(bpm, rLinear(0,1000), Units(bpm), "Beats Per Minute"),
-};
-#undef rObject
-
-#define rObject lfo_t
-rtosc::Ports lfo_ports = {
-    rParamF(freq, rLogarithmic(0.1, 1e3), Units(Hz), "Frequency"),
-    rParamF(amount, rLinear(0,8), UnitLess, "LFO Strength"),
-};
-#undef rObject
-
-#define rObject lpf_t
-rtosc::Ports filter_ports = {
-    rParamF(f, rLogarithmic(0.1, 10e3), "Cutoff Frequency"),
-    rParamF(Q, rLinear(0,5), "Q"),
-};
-#undef rObject
-
-#define BasePort(name,doc) {#name "/", rDoc(doc), &name##_ports, [](const char *msg, \
-                       rtosc::RtData &d)\
-                       {while(*msg != '/') msg++; msg++; d.obj = &name; \
-                       name##_ports.dispatch(msg,d);}}
-
-rtosc::Ports ports = {
-    BasePort(seq, "Sequencer"),
-    BasePort(lfo, "Low Frequency Oscillator"),
-    BasePort(filter, "Low Pass Filter"),
-};
-----------------------------------------------------------
+[source, cpp]
+--------------------------------------------------------------------------------
+include::06-documented-rtosc.cpp[tag=ports]
+--------------------------------------------------------------------------------
 
 Now the extra information will end up showing up in oscprompt, however this is
 entangled with the dynamic reflection which is less than ideal.
@@ -295,20 +262,21 @@ dumping ports to the input format.
 
 To do so, let's modify the start of main() to
 
-[source,cpp]
--------------------
+[source, cpp]
+--------------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
     if(argc == 3 && !strcmp(argv[1], "--dump-oscdoc")) {
         rtosc::ports_to_oscdoc(ports, argv[2]);
         return 0;
     }
--------------------
+--------------------------------------------------------------------------------
 
-------------
+[source, shell]
+--------------------------------------------------------------------------------
 ./rtosc-tutorial --dump-oscdoc oscdoc-file.xml
 bla bla
-------------
+--------------------------------------------------------------------------------
 
 Now just open up the resulting html index to see the API documentation
 
@@ -320,7 +288,7 @@ simple.
 This portion will be in FLTK due to it's simplicity, but any toolkit should
 work fine.
 
-[source,cpp]
+[source, cpp]
 --------------------------------------------------------------------------------
 include::gui.cpp[]
 --------------------------------------------------------------------------------
