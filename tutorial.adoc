@@ -264,18 +264,13 @@ To do so, let's modify the start of main() to
 
 [source, cpp]
 --------------------------------------------------------------------------------
-int main(int argc, char **argv)
-{
-    if(argc == 3 && !strcmp(argv[1], "--dump-oscdoc")) {
-        rtosc::ports_to_oscdoc(ports, argv[2]);
-        return 0;
-    }
+include::06-documented-rtosc.cpp[tag=oscdump]
 --------------------------------------------------------------------------------
 
 [source, shell]
 --------------------------------------------------------------------------------
 ./rtosc-tutorial --dump-oscdoc oscdoc-file.xml
-bla bla
+oscdoc oscdoc-file.xml oscdoc-output
 --------------------------------------------------------------------------------
 
 Now just open up the resulting html index to see the API documentation

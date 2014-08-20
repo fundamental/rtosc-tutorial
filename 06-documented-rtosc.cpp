@@ -304,6 +304,7 @@ int process(unsigned nframes, void *v)
 extern void middleware_init(void);
 extern void middleware_tick(void);
 
+// tag::oscdump[]
 int main(int argc, char **argv)
 {
     if(argc == 3 && !strcmp(argv[1], "--dump-oscdoc")) {
@@ -314,6 +315,7 @@ int main(int argc, char **argv)
         file << formatter;
         file.close();
     }
+    // end::oscdump[]
 
 
     middleware_init();
