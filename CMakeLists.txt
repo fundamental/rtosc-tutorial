@@ -8,6 +8,7 @@ find_package(PkgConfig              REQUIRED)
 pkg_check_modules(RTOSC librtosc    REQUIRED)
 pkg_check_modules(JACK  jack        REQUIRED)
 pkg_check_modules(LIBLO liblo>=0.26 REQUIRED)
+pkg_check_modules(XML   libxml-2.0  REQUIRED)
 
 find_program(ASCIIDOC asciidoctor)
 find_program(BLOCKDIAG blockdiag)
@@ -24,14 +25,18 @@ endif()
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -std=c11")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++11")
 
+#Include stuff
+include_directories(${XML_INCLUDE_DIRS})
+
 
 #Build Executables
-add_executable(01-tutorial 01-basic-jack.c)
-add_executable(02-tutorial 02-basic-app.c)
-add_executable(03-tutorial 03-basic-rtosc.cpp)
-add_executable(04-tutorial 04-macro-rtosc.cpp)
-add_executable(05-tutorial 05-lo-rtosc.cpp 05-middleware)
-add_executable(06-tutorial 06-documented-rtosc.cpp 06-middleware)
+add_executable(01-tutorial     01-basic-jack.c)
+add_executable(02-tutorial     02-basic-app.c)
+add_executable(03-tutorial     03-basic-rtosc.cpp)
+add_executable(04-tutorial     04-macro-rtosc.cpp)
+add_executable(05-tutorial     05-lo-rtosc.cpp 05-middleware.cpp)
+add_executable(06-tutorial     06-documented-rtosc.cpp 06-middleware.cpp)
+add_executable(07-tutorial-gui 07-gui.cpp)
 
 
 #Linker Flags
@@ -43,6 +48,7 @@ target_link_libraries(05-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
                                   ${LIBLO_LIBRARIES})
 target_link_libraries(06-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
                                   ${LIBLO_LIBRARIES})
-
+target_link_libraries(07-tutorial-gui ${LIBLO_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+                                      ${FLTK_LIBRARIES} ${XML_LIBRARIES})
 
 #Build Documentation (TODO)

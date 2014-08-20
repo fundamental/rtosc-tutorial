@@ -4,6 +4,7 @@
 #include <FL/Fl.H>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <rtosc/rtosc.h>
 #include <lo/lo.h>
 #include <string>
 #include <stdio.h>
@@ -30,14 +31,9 @@ void gui_init(void)
     Fl_Pack *pack = new Fl_Pack(0,0,300,300);
     pack->type(Fl_Pack::HORIZONTAL);
     sliders = new Fl_Slider*[nfields];
-    for(int i=0; i<nfields; ++i) {
-        sliders[i] = new Fl_Slider(0,0,0,0);
+    for(unsigned i=0; i<nfields; ++i) {
+        sliders[i] = new Fl_Slider(0,0,100,20);
         sliders[i]->type(FL_VERTICAL);
-        //Assert that it is a float based parameter <1>
-
-        //Fetch min/max <2>
-        
-        //Fetch description <3>
     }
 }
 
@@ -58,7 +54,7 @@ static void
 print_element_names(xmlNode * a_node)
 {
     xmlNode *cur_node = NULL;
-    cur_node->properties;
+    //cur_node->properties;
 
     for (cur_node = a_node; cur_node; cur_node = cur_node->next) {
         if (cur_node->type == XML_ELEMENT_NODE) {
@@ -74,6 +70,8 @@ print_element_names(xmlNode * a_node)
 //   - param_f min=abc max=def
 xmlNode *findSubtree(xmlNode *root, const std::string pattern)
 {
+    (void) root;
+    (void) pattern;
     return NULL;
 }
 
@@ -89,7 +87,7 @@ void updateSliderConfig(void *data, size_t data_size)
     LIBXML_TEST_VERSION
 
     /*parse the file and get the DOM */
-    doc = xmlReadMemory(data, data_size, NULL, NULL, 0);
+    doc = xmlReadMemory((char*)data, data_size, NULL, NULL, 0);
 
     if (doc == NULL) {
         printf("error: Invalid oscdoc received\n");
@@ -104,11 +102,25 @@ void updateSliderConfig(void *data, size_t data_size)
  *                         liblo Interface                            *
  *                                                                    *
  **********************************************************************/
+const char *osc_addr = 0;
+
+void send(const char *path, const char *args="", ...)
+{
+    char buffer[1024];
+    va_list va;
+    va_start(va, args);
+    size_t result = rtosc_vmessage(buffer, 1024, path, args, va);
+    va_end(va);
+    lo_address addr = lo_address_new_from_url(osc_addr);
+    lo_message msg  = lo_message_deserialise((void*)buffer, result, NULL);
+    lo_send_message(addr, path, msg);
+}
+
 static int handler_function(const char *path_, const char *types_, lo_arg **argv,
         int argc, lo_message msg, void *user_data)
 {
-    (void) argv;
     (void) argc;
+    (void) msg;
     (void) user_data;
     std::string path  = path_;
     std::string types = types_;
@@ -117,7 +129,7 @@ static int handler_function(const char *path_, const char *types_, lo_arg **argv
                            lo_blob_datasize(argv[0]));
     if(types == "f")
     {
-        for(int i=0; i<nfields; ++i)
+        for(unsigned i=0; i<nfields; ++i)
             if(path == fields[i])
                 sliders[i]->value(argv[0]->f);
     }
@@ -128,6 +140,13 @@ static int handler_function(const char *path_, const char *types_, lo_arg **argv
 
 int main(int argc, char **argv)
 {
+    //Get Port
+    if(argc != 2) {
+        fprintf(stderr, "usage: %s OSC_ADDRESS\n", argv[0]);
+        return 1;
+    }
+    osc_addr = argv[1];
+
     //Setup Liblo connection
     lo_server server = lo_server_new_with_proto(NULL, LO_UDP, NULL);
     lo_server_add_method(server, NULL, NULL, handler_function, NULL);
@@ -138,10 +157,23 @@ int main(int argc, char **argv)
     //Request information 
     //- oscdoc
     //- current values of ports
-    
-    //wait up to 1 sec for all pending requests to get handled
+    send("/oscdoc");
+    for(unsigned i=0; i<nfields; ++i)
+        send(fields[i]);
+
+
+    //wait up to 0.2 sec for all pending requests to get handled
+    for(int i=0; i<10; ++i)
+        lo_server_recv_noblock(server, 20);
 
     //Show the GUI and operate normally
+    fltk_window->show();
+
+    while(fltk_window->shown())
+    {
+        lo_server_recv_noblock(server, 10);
+        gui_tick();
+    }
 
     return 0;
 }
