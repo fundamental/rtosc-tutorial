@@ -36,6 +36,7 @@ add_executable(03-tutorial     03-basic-rtosc.cpp)
 add_executable(04-tutorial     04-macro-rtosc.cpp)
 add_executable(05-tutorial     05-lo-rtosc.cpp 05-middleware.cpp)
 add_executable(06-tutorial     06-documented-rtosc.cpp 06-middleware.cpp)
+add_executable(07-tutorial     07-rtosc.cpp 07-middleware.cpp)
 add_executable(07-tutorial-gui 07-gui.cpp)
 
 
@@ -47,6 +48,8 @@ target_link_libraries(04-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
 target_link_libraries(05-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
                                   ${LIBLO_LIBRARIES})
 target_link_libraries(06-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+                                  ${LIBLO_LIBRARIES})
+target_link_libraries(07-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
                                   ${LIBLO_LIBRARIES})
 target_link_libraries(07-tutorial-gui ${LIBLO_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
                                       ${FLTK_LIBRARIES} ${XML_LIBRARIES})
