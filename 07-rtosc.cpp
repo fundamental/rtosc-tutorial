@@ -287,7 +287,10 @@ int process(unsigned nframes, void *v)
     while(uToB.hasNext())
     {
         RtDataImpl d;
-        ports.dispatch(uToB.read(), d);
+        d.matches = 0;
+        ports.dispatch(uToB.read()+1, d);
+        if(d.matches == 0)
+            fprintf(stderr, "Unknown Port '%s'\n", uToB.peak());
     }
     // end::buf-read
 

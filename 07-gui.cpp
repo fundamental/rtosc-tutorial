@@ -7,7 +7,10 @@
 #include <rtosc/rtosc.h>
 #include <lo/lo.h>
 #include <string>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstring>
+#include <cstdio>
+#include <err.h>
 
 /**********************************************************************
  *                           FLTK GUI Code                            *
@@ -18,22 +21,29 @@
 const char *fields[] = {
     "/seq/freq1",
     "/lfo/freq",
-    "/filter/freq"
+    "/filter/f"
 };
 unsigned nfields = sizeof(fields)/sizeof(*fields);
 Fl_Slider **sliders;
 
+void send(const char *path, const char *args="", ...);
+void slider_cb(Fl_Slider *s, void *data)
+{
+    int offset = (int)data;
+    send(fields[offset], "f", s->value());
+}
 
 Fl_Window *fltk_window;
 void gui_init(void)
 {
-    fltk_window  = new Fl_Window(300,300);
+    fltk_window  = new Fl_Window(300,300, "rtosc Tutorial GUI");
     Fl_Pack *pack = new Fl_Pack(0,0,300,300);
     pack->type(Fl_Pack::HORIZONTAL);
     sliders = new Fl_Slider*[nfields];
     for(unsigned i=0; i<nfields; ++i) {
         sliders[i] = new Fl_Slider(0,0,100,20);
         sliders[i]->type(FL_VERTICAL);
+        sliders[i]->callback((Fl_Callback_p)slider_cb, (void*)i);
     }
 }
 
@@ -50,19 +60,41 @@ void gui_tick(void)
  *    messages will be accepted and to validate the user generated    *
  *    list of port names to work with.                                *
  **********************************************************************/
-static void
-print_element_names(xmlNode * a_node)
+bool oscdoc_str_eq(const char *path, const char *pattern)
 {
-    xmlNode *cur_node = NULL;
-    //cur_node->properties;
+    if(!strcmp(pattern, path))
+        return true;
 
-    for (cur_node = a_node; cur_node; cur_node = cur_node->next) {
-        if (cur_node->type == XML_ELEMENT_NODE) {
-            printf("node type: Element, name: %s\n", cur_node->name);
+    //Compare ignoring {}
+    while(*pattern && *path)
+    {
+        if(*pattern != '{') {
+            if(*pattern != *path)
+                break;
+            pattern++;
+            path++;
+        } else {
+            while(*pattern && *pattern != '}')
+                pattern++;
+            if(*pattern == '}')
+                pattern++;
+            while(isdigit(*path))
+                path++;
         }
-
-        print_element_names(cur_node->children);
     }
+
+    return !*path && !*pattern;
+}
+
+bool pattern_is(xmlNode *node, const char *pattern)
+{
+    for(auto *props = node->properties; props; props = props->next) {
+        if(!strcmp("pattern", (char*)props->name) &&
+                oscdoc_str_eq(pattern, (char*)props->children->content)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // - message_in pattern=xyz
@@ -70,8 +102,18 @@ print_element_names(xmlNode * a_node)
 //   - param_f min=abc max=def
 xmlNode *findSubtree(xmlNode *root, const std::string pattern)
 {
-    (void) root;
-    (void) pattern;
+    if(!root->children)
+        return NULL;
+
+    root = root->children;
+
+    for(xmlNode *node = root; node; node = node->next) {
+        if(node->type == XML_ELEMENT_NODE &&
+                !strcmp("message_in", (const char*)node->name) &&
+                pattern_is(node, pattern.c_str())) {
+            return node->children;
+        }
+    }
     return NULL;
 }
 
@@ -79,20 +121,49 @@ xmlDoc *doc = NULL;
 void getPortParams(const std::string name,
         float &min, float &max, std::string &doc)
 {
-    auto *node = findSubtree(xmlDocGetRootElement(::doc), name);
+    auto *node_ = findSubtree(xmlDocGetRootElement(::doc), name);
+    if(!node_)
+        errx(1, "Mismatch between oscdoc and specified fields");
+
+    for(xmlNode *node = node_; node; node = node->next) {
+        if(node->type == XML_ELEMENT_NODE &&
+                !strcmp("desc", (const char*)node->name))
+            doc = (const char*)node->children->content;
+
+        if(node->type == XML_ELEMENT_NODE &&
+                !strcmp("param_f", (const char*)node->name)) {
+            for(auto *props = node->children->next->properties; props; props = props->next) {
+                if(!strcmp("min", (char*)props->name))
+                    min = atof((char*)props->children->content);
+                if(!strcmp("max", (char*)props->name))
+                    max = atof((char*)props->children->content);
+            }
+        }
+    }
 }
 
-void updateSliderConfig(void *data, size_t data_size)
+void updateSliderConfig(const char *data, size_t data_size)
 {
     LIBXML_TEST_VERSION
 
-    /*parse the file and get the DOM */
-    doc = xmlReadMemory((char*)data, data_size, NULL, NULL, 0);
+    doc = xmlReadMemory(data, data_size, NULL, NULL, 0);
 
     if (doc == NULL) {
         printf("error: Invalid oscdoc received\n");
     }
-    
+
+    for(unsigned i=0; i<nfields; ++i) {
+        float min = 0.0f;
+        float max = 1.0f;
+        std::string doc = "undocumented";
+        getPortParams(fields[i], min, max, doc);
+        sliders[i]->tooltip(strdup(doc.c_str()));
+        sliders[i]->minimum(min);
+        sliders[i]->maximum(max);
+        printf("port is [%f,%f], '%s'\n", min, max, doc.c_str());
+    }
+
+
     xmlFreeDoc(doc);
     xmlCleanupParser();
 }
@@ -104,7 +175,7 @@ void updateSliderConfig(void *data, size_t data_size)
  **********************************************************************/
 const char *osc_addr = 0;
 
-void send(const char *path, const char *args="", ...)
+void send(const char *path, const char *args, ...)
 {
     char buffer[1024];
     va_list va;
@@ -116,6 +187,7 @@ void send(const char *path, const char *args="", ...)
     lo_send_message(addr, path, msg);
 }
 
+bool got_response = false;
 static int handler_function(const char *path_, const char *types_, lo_arg **argv,
         int argc, lo_message msg, void *user_data)
 {
@@ -124,14 +196,15 @@ static int handler_function(const char *path_, const char *types_, lo_arg **argv
     (void) user_data;
     std::string path  = path_;
     std::string types = types_;
-    if(path == "/oscdoc" && types == "b")
-        updateSliderConfig(lo_blob_dataptr(argv[0]),
-                           lo_blob_datasize(argv[0]));
-    if(types == "f")
-    {
-        for(unsigned i=0; i<nfields; ++i)
-            if(path == fields[i])
+    if(path == "/oscdoc" && types == "s") {
+        got_response = true;
+        updateSliderConfig(&argv[0]->s, strlen(&argv[0]->s));
+    } if(types == "f") {
+        for(unsigned i=0; i<nfields; ++i) {
+            if(path == fields[i]) {
                 sliders[i]->value(argv[0]->f);
+            }
+        }
     }
     return 0;
 }
@@ -150,11 +223,11 @@ int main(int argc, char **argv)
     //Setup Liblo connection
     lo_server server = lo_server_new_with_proto(NULL, LO_UDP, NULL);
     lo_server_add_method(server, NULL, NULL, handler_function, NULL);
-    
+
     //Setup GUI
     gui_init();
-    
-    //Request information 
+
+    //Request information
     //- oscdoc
     //- current values of ports
     send("/oscdoc");
@@ -166,12 +239,15 @@ int main(int argc, char **argv)
     for(int i=0; i<10; ++i)
         lo_server_recv_noblock(server, 20);
 
+    if(!got_response)
+        errx(1, "No response from client. Bad OSC address?");
+
     //Show the GUI and operate normally
     fltk_window->show();
 
     while(fltk_window->shown())
     {
-        lo_server_recv_noblock(server, 10);
+        while(lo_server_recv_noblock(server, 10));
         gui_tick();
     }
 

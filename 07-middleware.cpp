@@ -93,7 +93,7 @@ static int handler_function(const char *path, const char *types, lo_arg **argv,
         rtosc::OscDocFormatter oscformatter{&::ports, "", "", "", "", ""};
         std::stringstream s;
         s << oscformatter;
-         
+
         lo_address addr = lo_address_new_from_url(last_url.c_str());
         if(addr)
             lo_send(addr, "/oscdoc", "s", s.str().c_str());
