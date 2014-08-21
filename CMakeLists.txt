@@ -38,6 +38,8 @@ add_executable(05-tutorial     05-lo-rtosc.cpp 05-middleware.cpp)
 add_executable(06-tutorial     06-documented-rtosc.cpp 06-middleware.cpp)
 add_executable(07-tutorial     07-rtosc.cpp 07-middleware.cpp)
 add_executable(07-tutorial-gui 07-gui.cpp)
+add_executable(08-tutorial     08-rtosc.cpp 08-middleware.cpp)
+add_executable(08-tutorial-gui 08-gui.cpp)
 
 
 #Linker Flags
@@ -52,6 +54,10 @@ target_link_libraries(06-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
 target_link_libraries(07-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
                                   ${LIBLO_LIBRARIES})
 target_link_libraries(07-tutorial-gui ${LIBLO_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+                                      ${FLTK_LIBRARIES} ${XML_LIBRARIES})
+target_link_libraries(08-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+                                  ${LIBLO_LIBRARIES})
+target_link_libraries(08-tutorial-gui ${LIBLO_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
                                       ${FLTK_LIBRARIES} ${XML_LIBRARIES})
 
 #Build Documentation (TODO)
