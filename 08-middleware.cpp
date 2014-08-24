@@ -1,4 +1,5 @@
 #include <rtosc/thread-link.h>
+#include <rtosc/miditable.h>
 #include <rtosc/ports.h>
 #include <lo/lo.h>
 #include <string>
@@ -7,6 +8,8 @@
 using std::string;
 
 extern rtosc::ThreadLink bToU, uToB;
+extern rtosc::MidiMapperRT midi_rt;
+extern rtosc::MidiMappernRT midi_nrt;
 extern rtosc::Ports ports;
 static lo_server server;
 static string last_url, curr_url;

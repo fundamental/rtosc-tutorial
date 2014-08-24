@@ -1,16 +1,117 @@
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Pack.H>
 #include <FL/Fl_Slider.H>
+#include <FL/Fl_Menu.H>
 #include <FL/Fl.H>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <rtosc/rtosc.h>
+#include <rtosc/undo-history.h>
 #include <lo/lo.h>
 #include <string>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
 #include <err.h>
+
+void send(const char *path, const char *args="", ...);
+void sendRaw(const char *msg){};
+
+/**********************************************************************
+ *                           Undo History                             *
+ **********************************************************************/
+rtosc::UndoHistory undoHistory;
+
+void undo_cb(const char *str)
+{
+    send("/echo", "s", "/UNDO_DISABLE");
+    sendRaw(str);
+    send("/echo", "s", "/UNDO_ENABLE");
+}
+
+int undo_redo_handler(int)
+{
+    const bool undo = Fl::event_ctrl() && Fl::event_key() == 'z';
+    const bool redo = Fl::event_ctrl() && Fl::event_key() == 'r';
+    if(undo) {
+        printf("Trying to undo an action\n");
+        undoHistory.seekHistory(-1);
+    } else if(redo) {
+        printf("Trying to redo an action\n");
+        undoHistory.seekHistory(+1);
+    }
+    return undo || redo;
+}
+
+/**********************************************************************
+ *                           Copy/Paste                               *
+ **********************************************************************/
+char *copy_data;
+size_t copy_data_size;
+void copy_request(void)
+{
+    send("/synth_state");
+}
+
+void copy_response(char *data, size_t data_size)
+{}
+
+void paste(void)
+{
+    send("/synth_state", "b", copy_data, copy_data_size);
+}
+
+/**********************************************************************
+ *                           MIDI Learn                               *
+ **********************************************************************/
+
+class Learning_Slider : public Fl_Slider
+{
+    static void fine_cb(Fl_Widget*, void *userdata)
+    {
+    }
+    static void coarse_cb(Fl_Widget*, void *userdata)
+    {
+    }
+public:
+    Learning_Slider(int X,int Y,int W,int H,const char*L=0)
+        :Fl_Slider(X,Y,W,H,L),
+         learned_fine(false),
+         learned_coarse(false)
+    {}
+
+    int handle(int ev)
+    {
+        switch (ev) {
+            case FL_PUSH:
+                if ( Fl::event_button() == FL_RIGHT_MOUSE ) {
+
+                    Fl_Menu_Item menu[] = {
+                        {learned_fine ? "Unlearn Fine CC" : "Learn Fine CC",
+                            0, fine_cb,  (void*)this},
+                        {learned_coarse ? "Unlearn Coarse CC" : "Learn Coarse CC",
+                              0, coarse_cb, (void*)this},
+                        {0}
+                    };
+                    const int ev_x = Fl::event_x();
+                    const int ev_y = Fl::event_y();
+                    const Fl_Menu_Item *m = menu->popup(ev_x, ev_y, 0, 0, 0);
+                    if(m)
+                        m->do_callback(0, m->user_data());
+                    return 1;
+                }
+                break;
+            case FL_RELEASE: //mask right mouse release
+                if(Fl::event_button() == FL_RIGHT_MOUSE)
+                    return 1;
+        }
+
+        return Fl_Slider::handle(ev);
+    }
+
+    bool learned_coarse;
+    bool learned_fine;
+};
 
 /**********************************************************************
  *                           FLTK GUI Code                            *
@@ -26,7 +127,6 @@ const char *fields[] = {
 unsigned nfields = sizeof(fields)/sizeof(*fields);
 Fl_Slider **sliders;
 
-void send(const char *path, const char *args="", ...);
 void slider_cb(Fl_Slider *s, void *data)
 {
     int offset = (int)data;
@@ -45,6 +145,8 @@ void gui_init(void)
         sliders[i]->type(FL_VERTICAL);
         sliders[i]->callback((Fl_Callback_p)slider_cb, (void*)i);
     }
+    Fl::add_handler(undo_redo_handler);
+    undoHistory.setCallback(undo_cb);
 }
 
 void gui_tick(void)

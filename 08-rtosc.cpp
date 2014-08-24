@@ -8,11 +8,15 @@
 #include <rtosc/ports.h>
 #include <rtosc/port-sugar.h>
 #include <rtosc/thread-link.h>
+#include <rtosc/miditable.h>
+#include <rtosc/subtree-serialize.h>
 #include <fstream>
 #include "jack_osc.h"
 //Global
 static float Fs=0.0;
 rtosc::ThreadLink bToU(1024,20), uToB(1024,20);
+rtosc::MidiMapperRT midi_rt;
+rtosc::MidiMappernRT midi_nrt;
 
 //Type Definition
 struct osc_t
@@ -251,12 +255,31 @@ rtosc::Ports ports = {
     BasePort(filter, "Low Pass Filter"),
     {"echo", rProp(internal) rDoc("Echo Message Back") , 0,
             [](const char *m, rtosc::RtData &d) {d.reply(m-1);}},
+    midi_rt.addWatchPort(),
+    midi_rt.removeWatchPort(),
+    midi_rt.bindPort(),
+    {"undo_pause:", 0, 0, [](const char *, rtosc::RtData &d)
+        {d.reply("/undo_pause","");}},
+    {"undo_resume:", 0, 0, [](const char *, rtosc::RtData &d)
+        {d.reply("/undo_resume","");}},
+    {"system_state::b", 0, 0, [](const char *msg, rtosc::RtData &d)
+        {
+            if(rtosc_narguments(msg) == 0) {
+                char buffer[4096];
+                size_t len = subtree_serialize(buffer, 4096, d.obj, &ports);
+                d.reply("/system_state", "b", len, buffer);
+            } else {
+                rtosc_blob_t b = rtosc_argument(msg,0).b;
+                subtree_deserialize((char*)b.data, b.len, d.obj, &ports, d);
+            }
+        }},
 };
 // end::ports[]
 
 jack_client_t *client;
 jack_port_t   *port;
 jack_port_t   *josc;
+jack_port_t   *jmidi;
 
 int process(unsigned nframes, void *v)
 {
@@ -283,6 +306,20 @@ int process(unsigned nframes, void *v)
             ports.dispatch((char*)in_event.buffer+1, d);
 		}
 	}
+
+    void *jmidi_buf = jack_port_get_buffer(jmidi, nframes);
+	event_count = jack_midi_get_event_count(jmidi_buf);
+    // tag::buf-read[]
+	if(event_count)
+	{
+		for(unsigned i=0; i<event_count; i++)
+		{
+			jack_midi_event_get(&in_event, jmidi_buf, i);
+            if((in_event.buffer[0] & 0xf0) == 0xb0)
+                midi_rt.handleCC(in_event.buffer[1], in_event.buffer[2]);
+		}
+	}
+
 
     while(uToB.hasNext())
     {
@@ -322,6 +359,13 @@ int main(int argc, char **argv)
 
 
     middleware_init();
+
+    //MIDI Learn
+    midi_rt.frontend = [](const char *msg){bToU.raw_write(msg);};
+    midi_rt.backend  = [](const char *msg){
+        RtDataImpl d;
+        ports.dispatch(msg+1, d);};
+
 	const char *client_name = "rtosc-tutorial";
 	jack_options_t options = JackNullOption;
 	jack_status_t status;
@@ -340,6 +384,9 @@ int main(int argc, char **argv)
 					  JackPortIsOutput, 0);
     josc = jack_port_register(client, "osc",
                       JACK_DEFAULT_OSC_TYPE,
+                      JackPortIsInput, 0);
+    jmidi = jack_port_register(client, "midi",
+                      JACK_DEFAULT_MIDI_TYPE,
                       JackPortIsInput, 0);
 
     //Setup
