@@ -29,7 +29,7 @@ Fl_Slider **sliders;
 void send(const char *path, const char *args="", ...);
 void slider_cb(Fl_Slider *s, void *data)
 {
-    int offset = (int)data;
+    int offset = (size_t)data;
     send(fields[offset], "f", s->value());
 }
 
@@ -40,7 +40,7 @@ void gui_init(void)
     Fl_Pack *pack = new Fl_Pack(0,0,300,300);
     pack->type(Fl_Pack::HORIZONTAL);
     sliders = new Fl_Slider*[nfields];
-    for(unsigned i=0; i<nfields; ++i) {
+    for(size_t i=0; i<nfields; ++i) {
         sliders[i] = new Fl_Slider(0,0,100,20);
         sliders[i]->type(FL_VERTICAL);
         sliders[i]->callback((Fl_Callback_p)slider_cb, (void*)i);
@@ -68,15 +68,15 @@ bool oscdoc_str_eq(const char *path, const char *pattern)
     //Compare ignoring {}
     while(*pattern && *path)
     {
-        if(*pattern != '{') {
+        if(*pattern != '[') {
             if(*pattern != *path)
                 break;
             pattern++;
             path++;
         } else {
-            while(*pattern && *pattern != '}')
+            while(*pattern && *pattern != ']')
                 pattern++;
-            if(*pattern == '}')
+            if(*pattern == ']')
                 pattern++;
             while(isdigit(*path))
                 path++;
@@ -183,6 +183,11 @@ void send(const char *path, const char *args, ...)
     size_t result = rtosc_vmessage(buffer, 1024, path, args, va);
     va_end(va);
     lo_address addr = lo_address_new_from_url(osc_addr);
+    if(!addr) {
+        fprintf(stderr, "Invalid liblo address '%s'\n", osc_addr);
+        fprintf(stderr, "Example URL: \"osc.udp://localhost:1234\"\n");
+        exit(1);
+    }
     lo_message msg  = lo_message_deserialise((void*)buffer, result, NULL);
     lo_send_message(addr, path, msg);
 }
