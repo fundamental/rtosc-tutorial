@@ -45,19 +45,19 @@ add_executable(08-tutorial-gui 08-gui.cpp)
 #Linker Flags
 target_link_libraries(01-tutorial ${JACK_LIBRARIES})
 target_link_libraries(02-tutorial ${JACK_LIBRARIES} m)
-target_link_libraries(03-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp)
-target_link_libraries(04-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp)
-target_link_libraries(05-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+target_link_libraries(03-tutorial ${JACK_LIBRARIES} rtosc-cpp ${RTOSC_LIBRARIES})
+target_link_libraries(04-tutorial ${JACK_LIBRARIES} rtosc-cpp ${RTOSC_LIBRARIES})
+target_link_libraries(05-tutorial ${JACK_LIBRARIES} rtosc-cpp ${RTOSC_LIBRARIES}
                                   ${LIBLO_LIBRARIES})
-target_link_libraries(06-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+target_link_libraries(06-tutorial ${JACK_LIBRARIES} rtosc-cpp ${RTOSC_LIBRARIES}
                                   ${LIBLO_LIBRARIES})
-target_link_libraries(07-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+target_link_libraries(07-tutorial ${JACK_LIBRARIES} rtosc-cpp ${RTOSC_LIBRARIES}
                                   ${LIBLO_LIBRARIES})
-target_link_libraries(07-tutorial-gui ${LIBLO_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+target_link_libraries(07-tutorial-gui ${LIBLO_LIBRARIES} rtosc-cpp ${RTOSC_LIBRARIES}
                                       ${FLTK_LIBRARIES} ${XML_LIBRARIES})
-target_link_libraries(08-tutorial ${JACK_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+target_link_libraries(08-tutorial ${JACK_LIBRARIES} rtosc-cpp ${RTOSC_LIBRARIES}
                                   ${LIBLO_LIBRARIES})
-target_link_libraries(08-tutorial-gui ${LIBLO_LIBRARIES} ${RTOSC_LIBRARIES} rtosc-cpp
+target_link_libraries(08-tutorial-gui ${LIBLO_LIBRARIES} rtosc-cpp ${RTOSC_LIBRARIES}
                                       ${FLTK_LIBRARIES} ${XML_LIBRARIES})
 
 #Build Documentation (TODO)
